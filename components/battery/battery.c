@@ -52,11 +52,11 @@ typedef struct Threshold {
 } Thresholds_t;
 
 // There's a ~400mV drop loaded down by the ADC mux (SN74LVC1G3157DSFR).
-// Originally tuned for 3x 1.5V AA, but later tuned for 3x 1.2V AA.
-const float kAA_Level_High_V = 3.60f;
-const float kAA_Level_Mid_V  = 3.15f;
-const float kAA_Level_Low_V  = 2.80f;
-const float kAA_Level_Depleted_V = 2.60f;
+// Originally tuned for 3x 1.5V AA, but later tuned for 3x 1.2V AA Eneloops.
+const float kAA_Level_High_V = 3.60f; // 1.33 on each cell
+const float kAA_Level_Mid_V  = 3.42f; // 1.27 on each cell
+const float kAA_Level_Low_V  = 3.29f; // 1.23 on each cell
+const float kAA_Level_Depleted_V = 2.90f; // 1.1 on each cell
 
 const float kLiPo_Level_High_V = 3.60f;
 const float kLiPo_Level_Mid_V  = 3.40f;
@@ -65,6 +65,8 @@ const float kLiPo_Level_Depleted_V = 3.00f;
 
 // Device limitation
 const float kLevel_MinValid_V = 2.0f;
+
+// actual power off: 0.7 on each cell
 
 const Thresholds_t _Thresholds[kNumBatteryKind] = {
     [kBatteryKind_AA] = {
@@ -420,6 +422,41 @@ static void set_fill_color(const float batt_V, const BatteryKind_t eKind)
     }
 }
 
+static float calculate_charge(const float batt_V, const BatteryKind_t eKind)
+{
+    // Points on the discharge curve
+    // (ideally we would have two more points but we use the available levels)
+    float voltages[] = {
+        _Thresholds[eKind].Level_Depleted,
+        _Thresholds[eKind].Level_Low,
+        _Thresholds[eKind].Level_Mid,
+        _Thresholds[eKind].Level_High,
+    };
+    float charges[]  = {0.0f, 0.2f, 0.5f, 1.0f};
+
+    if (batt_V <= voltages[0])
+    {
+        return charges[0];
+    }
+    if (batt_V >= voltages[3])
+    {
+        return charges[3];
+    }
+
+    // Linear interpolation
+    for (int i = 0; i < 3; i++) {
+        if (batt_V > voltages[i] && batt_V <= voltages[i+1]) {
+            float charge_range = charges[i+1] - charges[i];
+            float v_range = voltages[i+1] - voltages[i];
+            float v_offset = batt_V - voltages[i];
+            return charges[i] + v_offset / v_range * charge_range;
+        }
+    }
+
+    // Should never happen
+    return charges[0];
+}
+
 static void set_fill_level(const uint32_t i, Line_t *const pFill, const float batt_V, const BatteryKind_t eKind)
 {
     if (pFill == NULL)
@@ -443,10 +480,7 @@ static void set_fill_level(const uint32_t i, Line_t *const pFill, const float ba
     lv_point_t const *const pStartPoint = &pFill->points[kLineConst_PointStartIdx];
     lv_point_t *const pEndPoint = &pFill->points[kLineConst_PointEndIdx];
 
-    const float Depleted_V = _Thresholds[eKind].Level_Depleted;
-    const float High_V = _Thresholds[eKind].Level_High;
-
-    float percent_filled = (batt_V - Depleted_V) / (High_V - Depleted_V);
+    float percent_filled = calculate_charge(batt_V, eKind);
 
     if (percent_filled >= 0.95f)
     {
