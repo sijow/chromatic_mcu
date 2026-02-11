@@ -1,56 +1,21 @@
-# Chromatic MCU
-This repository houses the ModRetro Chromatic's MCU design files.
+# Chromatic MCU: small fixes
 
-## Toolchain Setup
-The project relies on the EspressIF IoT Development Framework (IDF) for development and debugging. Please set up the ESP32 according to the instructions at https://idf.espressif.com/.
+This is a fork of <https://github.com/ModRetro/chromatic_mcu> with some quality of life improvements.
 
-### Windows
-Please run the official ESP32 installer.
+Currently implemented (version `fix1`):
 
-### Linux
-The Ubuntu 24.04 steps are summarized below:
-```bash
-sudo apt-get install git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
-cd ~/path/to/clone/esp-idf
-git clone -b v5.3 --recursive https://github.com/espressif/esp-idf.git
-cd esp-idf
+- Battery level
 
-# Installs to the default ~/.espressif path. See IDF_TOOLS_PATH for an alternative.
-./install.sh esp32
+   The AA battery level thresholds are adjusted so that the level indicator in the menu is more accurate.
 
-# Update your path for your current session so that the `idf.py` tool can be accessed.
-source ./export.sh
-```
+   The charge level is computed using linear interpolation between the high, mid, low and depleted points (instead of linear interpolation between high and depleted).
 
-To permanently update your environment path, add the following to your shell startup script (e.g. `~/.bashrc`):
-```
-alias get_idf='. $HOME/esp-idf/export.sh'
-```
+   The thresholds are tuned for [Eneloop batteries](https://lygte-info.dk/review/batteries2012/Eneloop%20AA%20BK-3MCCE%201900mAh%20(White)%202019%20UK.html) but should also work well for other rechargeables.
 
-where `$HOME/esp-idf` is where you cloned the ESP IDF toolchain. Anytime you wish to develop, run `get_idf` in your terminal first. EspressIF does not recommend always running `export.sh` for every terminal. This may have unintended side effects.
+   The mid-level voltage (corresponding to 50% charge) is particularly difficult to choose as NiMH batteries have a rather flat discharge curve around 50% so a small difference in measured voltage corresponds to a large difference in charge. And since the voltage depends on the load, the correct 50%-level would not be the same when playing with high vs low brightness or sound volume. In practice, this means the battery indicator will turn yellow closer to 60% when playing at high power consumption and closer to 40% when playing at low power consumption.
+   
+   For the corresponding change to the battery icon overlay in the corner you need to flash the corresponding [FPGA configuration](https://github.com/knuesel/chromatic_fpga).
 
-## Build, Flashing, and Debugging
+## Usage
 
-Run `idf.py -p PORT build flash monitor` to build, flash and monitor the project. The default baud rate is `115200`.
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
-
-Each of these steps can be issued individually (build, flash, and monitor).
-
-## Serial Interface
-The Chromatic FPGA supports a composite USB device consisting of several device classes. One of them is a serial interface used for flashing and debugging. The setup steps depend on your operating system.
-
-### Windows
-A serial port for the ESP32 should already appear in the Device Manager as a COM device.
-You can also see this by issuing `modes` within a command prompt.
-
-### Linux
-Ensure you are part of the `dialout` group. You will need to log out and log back in after issuing the following command:
-```bash
-sudo gpasswd --add $USER dialout
-```
-
-If everything is working, you should see `/dev/ttyACM0` appear as the communications port to the MCU.
-
+See instructions on the [original project page](https://github.com/ModRetro/chromatic_mcu) for how to build and flash.
